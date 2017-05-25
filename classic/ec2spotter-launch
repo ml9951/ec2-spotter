@@ -76,10 +76,10 @@ cat >specs.tmp <<EOF
 }
 EOF
 
-# aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type persistent --launch-specification file://specs.tmp --region ${LAUNCH_REGION} > spot.tmp
+aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type persistent --launch-specification file://specs.tmp --region ${LAUNCH_REGION} > spot.tmp
 
-# SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
+SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
 
-# echo SPOT_ID=$SPOT_ID
+echo SPOT_ID=$SPOT_ID
 
 # aws ec2 create-tags --resources ${SPOT_ID} --tags Key=Name,Value=${ROOT_VOL_NAME} --region ${LAUNCH_REGION}
