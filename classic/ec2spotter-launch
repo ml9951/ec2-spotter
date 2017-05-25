@@ -5,22 +5,16 @@
 if [ "$1" = "" ]; then echo "USER ERROR: please specify a configuration file"; exit -1; fi
 
 . $1 || exit -1
+
 ROOT_VOL_NAME=$ec2spotter_volume_name
 
-LAUNCH_ZONE=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-LAUNCH_REGION=$(echo $LAUNCH_ZONE | sed -e 's/.$//')
-PUB_KEY=$(wget -q -O - http://169.254.169.254/latest/meta-data/public-keys | awk -F= '{print $2}')
-
-echo "ROOT_VOL_NAME=${ROOT_VOL_NAME}; LAUNCH_ZONE=${LAUNCH_ZONE}; LAUNCH_REGION=${LAUNCH_REGION}; PUB_KEY=${PUB_KEY}"
-
-export AWS_CREDENTIAL_FILE=/root/.aws.creds
-. /root/.aws.creds
-export AWS_ACCESS_KEY=$AWSAccessKeyId
-export AWS_SECRET_KEY=$AWSSecretKey
+# Get the user's AWS credentials
+if [ -z $AWS_SECRET_ACCESS_KEY ]; then
+        eval $(awk -F ' = ' 'NF == 2 {print toupper($1)"="$2 }' < ~/.aws/credentials)
+fi
 
 aws ec2 describe-volumes \
-	--filters Name=tag-key,Values="Name" Name=tag-value,Values="$ROOT_VOL_NAME" \
-	--region ${LAUNCH_REGION} > volumes.tmp || exit -1
+	--filters Name=tag-key,Values="Name" Name=tag-value,Values="$ROOT_VOL_NAME" > volumes.tmp || exit -1
 
 ROOT_ZONE=$(jq -r '.Volumes[0].AvailabilityZone' volumes.tmp)
 ROOT_VOL=$(jq -r '.Volumes[0].VolumeId' volumes.tmp)
@@ -36,15 +30,15 @@ fi
 
 cat >user-data.tmp <<EOF
 #!/bin/sh
-echo AWSAccessKeyId=$AWSAccessKeyId > /root/.aws.creds
-echo AWSSecretKey=$AWSSecretKey >> /root/.aws.creds
+echo AWSAccessKeyId=$AWS_ACCESS_KEY_ID > /root/.aws.creds
+echo AWSSecretKey=$AWS_SECRET_ACCESS_KEY >> /root/.aws.creds
 
 apt-get install -y git
 
 cd /root
 git clone https://github.com/atramos/ec2-spotter.git
 
-cd ec2-spotter
+cd ec2-spotter/classic
 ./ec2spotter-setup
 ./ec2spotter-remount-root --force ${ROOT_VOL_NAME} $ec2spotter_elastic_ip
 EOF
@@ -53,10 +47,14 @@ userData=$(base64 user-data.tmp | tr -d '\n');
 
 cat >specs.tmp <<EOF
 {
-  "KeyName" : "$PUB_KEY",
+  "KeyName" : "AIGH",
+  "SecurityGroups" : ["AIGH"],
   "InstanceType": "$ec2spotter_instance_type",
   "ImageId" : "$ec2spotter_preboot_image_id",
   "UserData" : "${userData}",
+  "Placement" : {
+    "AvailabilityZone": "$ROOT_ZONE"
+  },
   "BlockDeviceMappings": [
     {
       "DeviceName" : "/dev/sda1",
@@ -76,4 +74,4 @@ SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
 
 echo SPOT_ID=$SPOT_ID
 
-aws ec2 create-tags --resources ${SPOT_ID} --tags Key=Name,Value=${ROOT_VOL_NAME} --region ${LAUNCH_REGION}
+# aws ec2 create-tags --resources ${SPOT_ID} --tags Key=Name,Value=${ROOT_VOL_NAME} --region ${LAUNCH_REGION}
