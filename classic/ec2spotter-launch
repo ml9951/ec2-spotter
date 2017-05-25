@@ -44,7 +44,7 @@ source /root/.aws.creds
 apt-get install -y git
 
 cd /root
-git clone https://github.com/atramos/ec2-spotter.git
+git clone https://github.com/ml9951/ec2-spotter.git
 
 cd ec2-spotter/classic
 ./ec2spotter-setup
