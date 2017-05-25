@@ -33,6 +33,14 @@ cat >user-data.tmp <<EOF
 echo AWSAccessKeyId=$AWS_ACCESS_KEY_ID > /root/.aws.creds
 echo AWSSecretKey=$AWS_SECRET_ACCESS_KEY >> /root/.aws.creds
 
+mkdir ~/.aws
+
+echo "[default]" > ~/.aws/credentials
+echo aws_access_key_id = $AWS_ACCESS_KEY_ID >> ~/.aws/credentials
+echo aws_secret_access_key = $AWS_SECRET_ACCESS_KEY >> ~/.aws/credentials
+
+source /root/.aws.creds
+
 apt-get install -y git
 
 cd /root
@@ -68,10 +76,10 @@ cat >specs.tmp <<EOF
 }
 EOF
 
-aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type persistent --launch-specification file://specs.tmp --region ${LAUNCH_REGION} > spot.tmp
+# aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type persistent --launch-specification file://specs.tmp --region ${LAUNCH_REGION} > spot.tmp
 
-SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
+# SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
 
-echo SPOT_ID=$SPOT_ID
+# echo SPOT_ID=$SPOT_ID
 
 # aws ec2 create-tags --resources ${SPOT_ID} --tags Key=Name,Value=${ROOT_VOL_NAME} --region ${LAUNCH_REGION}
