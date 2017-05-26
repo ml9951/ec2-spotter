@@ -30,6 +30,10 @@ fi
 
 cat >user-data.tmp <<EOF
 #!/bin/sh
+
+service nginx start
+echo "Starting volume swap process..." > /var/www/html/index.html
+
 echo AWSAccessKeyId=$AWS_ACCESS_KEY_ID > /root/.aws.creds
 echo AWSSecretKey=$AWS_SECRET_ACCESS_KEY >> /root/.aws.creds
 
@@ -39,15 +43,12 @@ echo "[default]" > ~/.aws/credentials
 echo aws_access_key_id = $AWS_ACCESS_KEY_ID >> ~/.aws/credentials
 echo aws_secret_access_key = $AWS_SECRET_ACCESS_KEY >> ~/.aws/credentials
 
-source /root/.aws.creds
+. /root/.aws.creds
 
-apt-get install -y git
+cd /root/ec2-spotter/classic
 
-cd /root
-git clone https://github.com/ml9951/ec2-spotter.git
+echo "Remounting volumes..." >> /var/www/html/index.html
 
-cd ec2-spotter/classic
-./ec2spotter-setup
 ./ec2spotter-remount-root --force ${ROOT_VOL_NAME} $ec2spotter_elastic_ip
 EOF
 
@@ -76,7 +77,11 @@ cat >specs.tmp <<EOF
 }
 EOF
 
-aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type one-time --launch-specification file://specs.tmp --region ${LAUNCH_REGION} > spot.tmp
+SPOT_REGION=$(echo $ROOT_ZONE | sed 's/.$//') # Get the region by stripping the last character of the ROOT_ZONE
+
+ECHO $SPOT_REGION
+
+aws ec2 request-spot-instances --spot-price $ec2spotter_bid_price --type one-time --launch-specification file://specs.tmp --region ${SPOT_REGION} > spot.tmp
 
 SPOT_ID=$(jq -r '.SpotInstanceRequests[0].SpotInstanceRequestId' spot.tmp)
 
